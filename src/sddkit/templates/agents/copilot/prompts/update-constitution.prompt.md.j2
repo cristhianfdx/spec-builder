@@ -1,0 +1,32 @@
+---
+name: update-constitution
+description: Update the project constitution based on a requested change.
+---
+
+Configuration:
+- CHANGE_REQUEST: Describe what to add, remove, or modify
+
+Objective: Update .specify/memory/constitution.md to reflect the change described in {CHANGE_REQUEST}.
+
+Mandatory reading order:
+
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. All active specs in .specify/specs/ — to understand what depends on the constitution
+
+Execution rules:
+
+1. Read the current constitution in full.
+2. Apply the requested change precisely — do not rewrite unrelated sections.
+3. Preserve the existing structure, formatting, and section order.
+4. If the change contradicts an existing rule, flag the conflict explicitly and ask for clarification.
+5. If the change adds a new section, place it in the most logical position.
+6. Do not remove or alter the header (# Project Constitution — ...) or the normative reference block.
+7. After updating, run sdd check (or manually verify) that all specs are still consistent.
+
+Required output:
+
+1. What was changed in the constitution (before / after summary).
+2. Which sections were modified.
+3. Whether any existing specs may be affected by this change.
+4. Recommendation: whether sdd sync should be run to update AGENTS.md.

@@ -100,6 +100,7 @@ AGENTS: dict[str, AgentConfig] = {
             AgentFile("prompts/execute-spec.prompt.md.j2", ".github/prompts/execute-spec.prompt.md", raw=True),
             AgentFile("prompts/sync-agent.prompt.md.j2",   ".github/prompts/sync-agent.prompt.md",   raw=True),
             AgentFile("prompts/new-spec.prompt.md.j2",     ".github/prompts/new-spec.prompt.md",     raw=True),
+            AgentFile("prompts/update-constitution.prompt.md.j2", ".github/prompts/update-constitution.prompt.md", raw=True),
         ],
         full=[],
     ),
