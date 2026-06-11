@@ -1,0 +1,46 @@
+---
+name: update-plan
+description: Update plan.md of an existing spec — technical decisions, modules, architecture
+variables:
+  - name: SPEC_NAME
+    description: Spec folder name (e.g. 001-my-feature)
+    required: true
+  - name: CHANGE_REQUEST
+    description: What to add, remove, or modify in plan.md
+    required: true
+  - name: AGENT
+    description: Active AI agent
+    default: "claude-code"
+agents: [claude-code, copilot, cursor, gemini-cli, generic]
+---
+
+# Update Plan — {{ SPEC_NAME }}
+
+**Agent:** {{ AGENT }}
+**Change:** {{ CHANGE_REQUEST }}
+
+## Mandatory Reading Order
+
+1. `.specify/memory/constitution.md`
+2. `.specify/specs/{{ SPEC_NAME }}/spec.md`
+3. `.specify/specs/{{ SPEC_NAME }}/plan.md`
+4. `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+
+## Execution Rules
+
+1. Read `plan.md` in full before changing anything.
+2. Apply the requested change precisely — do not rewrite unrelated sections.
+3. Preserve existing structure, formatting, and section order.
+4. **Adding a decision:** append to Technical Decisions with a number and rationale.
+5. **Removing a decision:** mark as `~~Decision N~~ (superseded by: <new decision>)` — never hard-delete unless explicitly asked.
+6. **Updating module responsibilities:** edit only the affected rows in the table. Do not restructure the table.
+7. **Architecture changes:** update the Architecture section and flag any tasks in `tasks.md` that may need revision.
+8. Do not duplicate rules or constraints already in `constitution.md`.
+9. If the change contradicts the constitution, flag it and stop.
+
+## Required Output
+
+1. What changed in `plan.md` (before / after summary per section).
+2. Whether `tasks.md` needs revision due to architectural changes.
+3. Whether the change is consistent with `spec.md` acceptance criteria.
+4. Recommended next action if follow-up is needed.

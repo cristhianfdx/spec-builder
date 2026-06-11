@@ -1,11 +1,5 @@
 """
 sdd init — initialize a new or existing project with SDD structure.
-
-Usage:
-  sdd init                              # interactive
-  sdd init my-project                   # creates ./my-project/
-  sdd init --here                       # initializes in current directory
-  sdd init my-project --agent claude-code --profile full
 """
 
 from __future__ import annotations
@@ -21,12 +15,22 @@ from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from jinja2 import Environment, StrictUndefined
 
-from sddkit.agents.registry import list_agents, get_agent, AgentFile
+from sddkit.agents.registry import list_agents, get_agent
 from sddkit.engines.template import _templates_dir
 
 console = Console()
 
 PROFILES = ["basic", "standard", "full"]
+
+BASE_PROMPTS = [
+    "execute-spec.md.j2",
+    "sync-agent.md.j2",
+    "new-spec.md.j2",
+    "update-constitution.md.j2",
+    "update-spec.md.j2",
+    "update-plan.md.j2",
+    "update-tasks.md.j2",
+]
 
 
 def _slugify(text: str) -> str:
@@ -68,12 +72,14 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
     _write(spec_dir / "plan.md", _render(tpl_root / "plan.md.j2", {**ctx, "spec_name": "Initial Setup"}))
     _write(spec_dir / "tasks.md", _render(tpl_root / "tasks.md.j2", ctx))
 
-    # .specify/prompts/ — sdd-format, raw copy (contain user-facing {{ }} variables)
+    # .specify/prompts/ — raw copy (contain user-facing {{ }} variables)
     prompts_src = tpl_root / "prompts"
     prompts_dir = project_root / ".specify" / "prompts"
-    for prompt_tpl in ["execute-spec.md.j2", "sync-agent.md.j2", "new-spec.md.j2", "update-constitution.md.j2"]:
+    for prompt_tpl in BASE_PROMPTS:
         dest_name = prompt_tpl.replace(".j2", "")
-        _write(prompts_dir / dest_name, (prompts_src / prompt_tpl).read_text(encoding="utf-8"))
+        src = prompts_src / prompt_tpl
+        if src.exists():
+            _write(prompts_dir / dest_name, src.read_text(encoding="utf-8"))
 
     # Custom prompts placeholder
     custom_keep = prompts_dir / "custom" / ".gitkeep"
@@ -99,22 +105,18 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
     for af in agent.files_for_profile(profile):
         src = agent_tpl / af.src
         dst = project_root / af.dst
-
         if not src.exists():
-            console.print(f"  [yellow]skipped[/] {af.dst} (template not found: {src})")
+            console.print(f"  [yellow]skipped[/] {af.dst} (template not found)")
             continue
-
         content = src.read_text(encoding="utf-8") if af.raw else _render(src, ctx)
         _write(dst, content)
-
         if af.executable:
             dst.chmod(dst.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
-    # AGENTS.md (always, unless agent already generates it)
+    # AGENTS.md
     agents_md = project_root / "AGENTS.md"
     if not agents_md.exists():
-        generic_tpl = tpl_root / "agents" / "generic" / "AGENTS.md.j2"
-        _write(agents_md, _render(generic_tpl, {**ctx, "specs": []}))
+        _write(agents_md, _render(tpl_root / "agents" / "generic" / "AGENTS.md.j2", {**ctx, "specs": []}))
 
     # .gitignore
     gitignore = project_root / ".gitignore"
@@ -132,7 +134,6 @@ def init_command(
 
     console.print("\n[bold cyan]sdd init[/] — Spec-Driven Development setup\n")
 
-    # Project root
     if here:
         project_root = Path.cwd()
         project_name = project or project_root.name
@@ -143,7 +144,6 @@ def init_command(
         project_name = Prompt.ask("[bold]Project name[/]")
         project_root = Path.cwd() / _slugify(project_name)
 
-    # Agent selection
     agents = list_agents()
     if not agent:
         console.print("\n[bold]Available agents:[/]")
@@ -155,20 +155,16 @@ def init_command(
         except (ValueError, IndexError):
             agent = "generic"
 
-    # Profile selection
     if not profile:
         agent_cfg = get_agent(agent)
-        has_standard = bool(agent_cfg.standard)
-        has_full = bool(agent_cfg.full)
-
-        if has_full:
+        if agent_cfg.full:
             console.print("\n[bold]Profile:[/]")
             console.print("  1. basic    — instruction file only")
             console.print("  2. standard — + hooks, skills, prompts")
             console.print("  3. full     — + sub-agents")
             p = Prompt.ask("\nChoose profile", default="2")
             profile = {"1": "basic", "2": "standard", "3": "full"}.get(p, "standard")
-        elif has_standard:
+        elif agent_cfg.standard:
             console.print("\n[bold]Profile:[/]")
             console.print("  1. basic    — instruction file only")
             console.print("  2. standard — + prompts / extra config")
@@ -181,7 +177,6 @@ def init_command(
         console.print(f"[red]Unknown profile '{profile}'.[/] Choose from: {', '.join(PROFILES)}")
         raise typer.Exit(1)
 
-    # Confirm existing directory
     if project_root.exists() and any(project_root.iterdir()):
         if not Confirm.ask(f"\n[yellow]{project_root}[/] already exists. Initialize SDD here?"):
             raise typer.Abort()

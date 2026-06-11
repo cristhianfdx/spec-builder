@@ -1,0 +1,46 @@
+---
+name: update-spec
+description: Update spec.md of an existing spec — criteria, status, scope, or dependencies
+variables:
+  - name: SPEC_NAME
+    description: Spec folder name (e.g. 001-my-feature)
+    required: true
+  - name: CHANGE_REQUEST
+    description: What to add, remove, or modify in spec.md
+    required: true
+  - name: AGENT
+    description: Active AI agent
+    default: "claude-code"
+agents: [claude-code, copilot, cursor, gemini-cli, generic]
+---
+
+# Update Spec — {{ SPEC_NAME }}
+
+**Agent:** {{ AGENT }}
+**Change:** {{ CHANGE_REQUEST }}
+
+## Mandatory Reading Order
+
+1. `.specify/memory/constitution.md`
+2. `.specify/specs/{{ SPEC_NAME }}/spec.md`
+3. `.specify/specs/{{ SPEC_NAME }}/plan.md`
+4. `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+
+## Execution Rules
+
+1. Read `spec.md` in full before changing anything.
+2. Apply the requested change precisely — do not rewrite unrelated sections.
+3. Preserve existing structure, formatting, and section order.
+4. **Adding criteria:** append to the Acceptance Criteria list. Do not renumber existing ones.
+5. **Removing criteria:** mark as `~~criterion~~ (removed: <reason>)` — never hard-delete unless explicitly asked.
+6. **Updating scope:** modify the Out of Scope section. Flag anything that now conflicts with `plan.md` or `tasks.md`.
+7. **Updating status:** only valid transitions are `draft → in-progress → complete`. Do not skip states.
+8. If the change contradicts the constitution, flag it and stop.
+9. After updating `spec.md`, check if `tasks.md` needs new tasks to cover added criteria.
+
+## Required Output
+
+1. What changed in `spec.md` (before / after summary per section).
+2. Whether `plan.md` or `tasks.md` need follow-up updates.
+3. Whether the change is consistent with the constitution.
+4. Recommended next action: run `sdd prompt run update-tasks` if new criteria were added.

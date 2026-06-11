@@ -1,0 +1,45 @@
+---
+name: update-tasks
+description: Update tasks.md — add, remove, reorder, or mark tasks obsolete without touching completed ones
+variables:
+  - name: SPEC_NAME
+    description: Spec folder name (e.g. 001-my-feature)
+    required: true
+  - name: CHANGE_REQUEST
+    description: What to add, remove, or reorganize in tasks.md
+    required: true
+  - name: AGENT
+    description: Active AI agent
+    default: "claude-code"
+agents: [claude-code, copilot, cursor, gemini-cli, generic]
+---
+
+# Update Tasks — {{ SPEC_NAME }}
+
+**Agent:** {{ AGENT }}
+**Change:** {{ CHANGE_REQUEST }}
+
+## Mandatory Reading Order
+
+1. `.specify/memory/constitution.md`
+2. `.specify/specs/{{ SPEC_NAME }}/spec.md`
+3. `.specify/specs/{{ SPEC_NAME }}/plan.md`
+4. `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+
+## Execution Rules
+
+1. Read `tasks.md` and `spec.md` in full before changing anything.
+2. **NEVER modify or remove completed tasks** (`- [x]`). They are a permanent record.
+3. **Adding tasks:** append new `- [ ]` items. New tasks must map to a criterion in `spec.md`.
+4. **Removing a pending task:** mark as `- [~] ~~task~~ (obsolete: <reason>)` — never hard-delete.
+5. **Reordering:** only reorder pending tasks (`- [ ]`). Never move completed ones.
+6. **Splitting a task:** replace the original pending task with 2–3 smaller ones. Add a comment `<!-- split from: original task text -->`.
+7. All new tasks must be atomic — completable in a single focused session.
+8. If the change request adds tasks not covered by any criterion in `spec.md`, flag it and ask whether `spec.md` should be updated first.
+
+## Required Output
+
+1. What changed in `tasks.md` (tasks added / marked obsolete / reordered).
+2. Total pending tasks remaining after the update.
+3. Whether new tasks are covered by existing criteria in `spec.md`.
+4. Whether `sdd sync` should be run to update task counts in `AGENTS.md`.
