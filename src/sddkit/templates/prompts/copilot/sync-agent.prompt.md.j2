@@ -1,0 +1,56 @@
+---
+name: sync-agent
+description: Regenerate or update AGENTS.md to reflect the current project state.
+---
+
+Objective:
+- Keep AGENTS.md always up to date with the latest project state.
+- If AGENTS.md does not exist, create it from scratch.
+
+Inputs:
+- BASE_DIR: ./
+- AGENT_FILE: AGENTS.md
+
+Mandatory reading order:
+
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. All active specs: spec.md, plan.md, tasks.md
+
+Execution flow:
+
+1. Detect relevant project changes:
+   - Inspect the current folder and file structure.
+   - Prioritize changes in the source directory, .specify/, and .github/.
+   - Identify additions, removals, and modifications that affect system behavior or workflow.
+
+2. Sync AGENTS.md:
+   - If it exists: update only what changed (incremental, do not rewrite everything).
+   - If it does not exist: create it with the full structure below.
+   - Preserve useful manual content that does not contradict the real repo state.
+   - Remove obsolete or inconsistent information.
+
+Required structure for AGENTS.md (minimum):
+
+- Project summary
+- Tech stack and constraints
+- Current folder structure
+- Key modules and their responsibilities
+- Agent operational flows (how to contribute, validate, and maintain consistency)
+- SDD rules applicable to this repo
+- Critical files and their purpose
+- "Last sync" section with today's date and a short summary of detected changes
+
+Quality criteria:
+
+- Clear, actionable, unambiguous content.
+- No invented files, commands, or capabilities.
+- Consistent with the constitution and the active spec.
+- Plain text only (no emojis, no Unicode icons).
+
+Required output when done:
+
+1. Whether AGENTS.md was created or updated.
+2. Summary of changes applied.
+3. List of project files considered for the sync.
+4. Confirmation that the content is aligned with .specify/ and the current repo state.

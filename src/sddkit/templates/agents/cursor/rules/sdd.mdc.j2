@@ -1,0 +1,24 @@
+---
+description: Spec-Driven Development rules for {{ project_name }}
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# SDD Rules — {{ project_name }}
+
+Always use Spec-Driven Development. Before any change, read:
+
+1. `.specify/memory/constitution.md`
+2. `.specify/specs/<active-spec>/spec.md`
+3. `.specify/specs/<active-spec>/plan.md`
+4. `.specify/specs/<active-spec>/tasks.md`
+
+- `.specify/` is the source of truth.
+- Only implement what is in `spec.md`.
+- Work task by task from `tasks.md`.
+- Only pending checks (`- [ ]`). Mark done only when truly complete.
+- After each change: explain task completed + files modified.
+- Conflict resolution: `constitution.md` > `spec.md` > `plan.md`.
+
+---
+*Managed by spec-builder. Last updated: {{ date }}*

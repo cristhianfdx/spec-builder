@@ -1,0 +1,24 @@
+# GEMINI.md — {{ project_name }}
+
+Always use Spec-Driven Development in this repository.
+
+Before making any changes, identify the active spec and read in this order:
+
+1. `.specify/memory/constitution.md`
+2. `.specify/specs/<active-spec>/spec.md`
+3. `.specify/specs/<active-spec>/plan.md`
+4. `.specify/specs/<active-spec>/tasks.md`
+
+## Rules
+
+- Treat `.specify/` as the source of truth.
+- Do not implement features not described in `spec.md`.
+- Follow `plan.md` for architecture and sequencing.
+- Work task by task based on `tasks.md`.
+- Only work on pending checks (`- [ ]`) and mark them when truly complete.
+- If no tasks are pending, validate consistency instead of re-implementing.
+- After each change, explain what task was completed and which files were modified.
+- In case of conflict: `constitution.md` > `spec.md` > `plan.md`.
+
+---
+*Managed by spec-builder. Agent: Gemini CLI. Last updated: {{ date }}*

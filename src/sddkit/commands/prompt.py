@@ -2,10 +2,11 @@
 sdd prompt — manage and run custom prompts.
 
 Subcommands:
-  sdd prompt list                          # list all prompts (base + custom)
-  sdd prompt new <name>                    # scaffold a new custom prompt
-  sdd prompt run <name> --var KEY=VALUE    # render and print a prompt
-  sdd prompt show <name>                   # show prompt metadata
+  sdd prompt list                                    # list all prompts (base + custom + copilot)
+  sdd prompt new <name>                              # scaffold a new custom prompt (sdd format)
+  sdd prompt new <name> --format copilot             # scaffold a new Copilot .prompt.md
+  sdd prompt run <name> --var KEY=VALUE              # render and print a prompt
+  sdd prompt show <name>                             # show prompt metadata
 """
 
 from __future__ import annotations
@@ -16,10 +17,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from sddkit.engines.prompt import parse_prompt, render_prompt, PromptMeta
+from sddkit.engines.prompt import parse_prompt, render_prompt
 
 prompt_app = typer.Typer(no_args_is_help=True)
 console = Console()
+
+# --- Prompt scaffold templates ---
 
 CUSTOM_PROMPT_TEMPLATE = """\
 ---
@@ -67,6 +70,52 @@ Read the following documents in order before taking any action:
 4. What remains pending (if any).
 """
 
+COPILOT_PROMPT_TEMPLATE = """\
+---
+name: {name}
+description: {description}
+---
+
+Configuration:
+- SPEC_NAME: 001-initial-setup
+
+Path resolution:
+- SPEC_DIR = .specify/specs/{{SPEC_NAME}}
+- SPEC_FILE = {{SPEC_DIR}}/spec.md
+- PLAN_FILE = {{SPEC_DIR}}/plan.md
+- TASKS_FILE = {{SPEC_DIR}}/tasks.md
+
+Mandatory reading order:
+
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. {{SPEC_FILE}}
+4. {{PLAN_FILE}}
+5. {{TASKS_FILE}}
+
+Use these documents as the sole source of truth for all work in this session.
+
+Instructions:
+
+<!-- Describe what Copilot should do in this prompt -->
+
+Rules:
+
+- Treat .specify/ as the source of truth.
+- Only implement what is described in spec.md.
+- Follow plan.md for architecture decisions.
+- Work task by task from tasks.md.
+- Only work on pending checks (- [ ]) and mark them when truly complete.
+- After each change, explain what task was completed and which files were modified.
+
+Required output when done:
+
+1. What was built or modified.
+2. Which files were created or changed.
+3. Which tasks in {{TASKS_FILE}} are now marked complete.
+4. What remains pending (if any).
+"""
+
 
 def _find_project_root(start: Path) -> Path:
     current = start
@@ -78,8 +127,14 @@ def _find_project_root(start: Path) -> Path:
 
 
 def _collect_prompts(project_root: Path) -> dict[str, Path]:
-    """Return {name: path} for all prompts (base + custom)."""
+    """
+    Return {key: path} for all prompts:
+    - base:          .specify/prompts/*.md
+    - custom:        .specify/prompts/custom/*.md   → key = "custom/<stem>"
+    - copilot:       .github/prompts/*.prompt.md    → key = "copilot/<stem>"
+    """
     prompts: dict[str, Path] = {}
+
     base_dir = project_root / ".specify" / "prompts"
     if base_dir.exists():
         for p in sorted(base_dir.glob("*.md")):
@@ -88,12 +143,19 @@ def _collect_prompts(project_root: Path) -> dict[str, Path]:
     if custom_dir.exists():
         for p in sorted(custom_dir.glob("*.md")):
             prompts[f"custom/{p.stem}"] = p
+
+    # Copilot prompts (.github/prompts/*.prompt.md)
+    copilot_dir = project_root / ".github" / "prompts"
+    if copilot_dir.exists():
+        for p in sorted(copilot_dir.glob("*.prompt.md")):
+            prompts[f"copilot/{p.stem}"] = p
+
     return prompts
 
 
 @prompt_app.command("list")
 def prompt_list() -> None:
-    """List all available prompts (base and custom)."""
+    """List all available prompts (base, custom, and copilot)."""
     project_root = _find_project_root(Path.cwd())
     prompts = _collect_prompts(project_root)
 
@@ -103,47 +165,72 @@ def prompt_list() -> None:
 
     table = Table(title="Available prompts", show_lines=True)
     table.add_column("Name", style="cyan")
+    table.add_column("Format")
     table.add_column("Description")
     table.add_column("Variables")
-    table.add_column("Agents")
 
     for key, path in prompts.items():
         meta = parse_prompt(path)
-        vars_str = ", ".join(
-            f"{v.name}{'*' if v.required else ''}" for v in meta.variables
-        )
-        agents_str = ", ".join(meta.agents) if meta.agents else "all"
-        tag = "[dim](base)[/]" if "custom" not in key else "[green](custom)[/]"
-        table.add_row(f"{key} {tag}", meta.description, vars_str, agents_str)
+
+        if key.startswith("copilot/"):
+            fmt = "[yellow]copilot[/]"
+            vars_str = "{SPEC_NAME}, {AGENT} (inline)"
+        elif key.startswith("custom/"):
+            fmt = "[green]custom[/]"
+            vars_str = ", ".join(
+                f"{v.name}{'*' if v.required else ''}" for v in meta.variables
+            )
+        else:
+            fmt = "[dim]base[/]"
+            vars_str = ", ".join(
+                f"{v.name}{'*' if v.required else ''}" for v in meta.variables
+            )
+
+        table.add_row(key, fmt, meta.description, vars_str)
 
     console.print(table)
     console.print("\n[dim]* = required variable[/]")
+    console.print("[dim]copilot prompts: edit SPEC_NAME directly in the file and use via Copilot Chat[/]\n")
 
 
 @prompt_app.command("new")
 def prompt_new(
     name: str = typer.Argument(..., help="Prompt name (slug, e.g. 'review-spec')"),
     description: str = typer.Option("", "--description", "-d", help="Short description"),
+    fmt: str = typer.Option("sdd", "--format", "-f", help="Prompt format: 'sdd' (default) or 'copilot'"),
 ) -> None:
-    """Scaffold a new custom prompt in .specify/prompts/custom/."""
-    project_root = _find_project_root(Path.cwd())
-    custom_dir = project_root / ".specify" / "prompts" / "custom"
-    custom_dir.mkdir(parents=True, exist_ok=True)
+    """
+    Scaffold a new custom prompt.
 
-    dest = custom_dir / f"{name}.md"
+    sdd format  → .specify/prompts/custom/<name>.md   (Jinja2 variables, sdd prompt run)
+    copilot     → .github/prompts/<name>.prompt.md    (VS Code Copilot Chat format)
+    """
+    project_root = _find_project_root(Path.cwd())
+    title = name.replace("-", " ").title()
+    desc = description or f"Custom prompt: {title}"
+
+    if fmt == "copilot":
+        dest_dir = project_root / ".github" / "prompts"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{name}.prompt.md"
+        content = COPILOT_PROMPT_TEMPLATE.format(name=name, description=desc)
+        label = "Copilot prompt"
+        hint = "Edit SPEC_NAME in the file and use it via VS Code Copilot Chat (#<filename>)."
+    else:
+        dest_dir = project_root / ".specify" / "prompts" / "custom"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{name}.md"
+        content = CUSTOM_PROMPT_TEMPLATE.format(name=name, title=title, description=desc)
+        label = "sdd prompt"
+        hint = "Use with: sdd prompt run custom/{name} --var SPEC_NAME=001-my-feature"
+
     if dest.exists():
         console.print(f"[red]Prompt already exists:[/] {dest}")
         raise typer.Exit(1)
 
-    title = name.replace("-", " ").title()
-    content = CUSTOM_PROMPT_TEMPLATE.format(
-        name=name,
-        title=title,
-        description=description or f"Custom prompt: {title}",
-    )
     dest.write_text(content, encoding="utf-8", newline="\n")
-    console.print(f"\n[bold green]Created[/] custom prompt at [cyan]{dest}[/]")
-    console.print(f"Edit the file to customize variables and instructions.\n")
+    console.print(f"\n[bold green]Created[/] {label} at [cyan]{dest}[/]")
+    console.print(f"{hint}\n")
 
 
 @prompt_app.command("run")
@@ -152,13 +239,24 @@ def prompt_run(
     var: list[str] = typer.Option([], "--var", "-v", help="Variable override: KEY=VALUE"),
     copy: bool = typer.Option(False, "--copy", "-c", help="Copy output to clipboard"),
 ) -> None:
-    """Render a prompt with variable substitution and print it."""
+    """
+    Render a prompt with variable substitution and print it.
+
+    Only works with sdd-format prompts. Copilot prompts are edited directly.
+    """
     project_root = _find_project_root(Path.cwd())
     prompts = _collect_prompts(project_root)
 
     if name not in prompts:
         console.print(f"[red]Prompt '{name}' not found.[/] Run [bold]sdd prompt list[/] to see available prompts.")
         raise typer.Exit(1)
+
+    if name.startswith("copilot/"):
+        console.print(
+            f"[yellow]Copilot prompts are not rendered by sdd.[/]\n"
+            f"Edit SPEC_NAME directly in [cyan]{prompts[name]}[/] and use it via VS Code Copilot Chat."
+        )
+        raise typer.Exit()
 
     overrides: dict[str, str] = {}
     for v in var:
@@ -182,7 +280,8 @@ def prompt_run(
 
     if copy:
         try:
-            import subprocess, sys
+            import subprocess
+            import sys
             if sys.platform == "darwin":
                 subprocess.run(["pbcopy"], input=rendered.encode(), check=True)
             elif sys.platform == "win32":
@@ -207,9 +306,14 @@ def prompt_show(
         raise typer.Exit(1)
 
     meta = parse_prompt(prompts[name])
+    is_copilot = name.startswith("copilot/")
 
     console.print(f"\n[bold cyan]{meta.name}[/]")
-    console.print(f"[dim]{meta.description}[/]\n")
+    console.print(f"[dim]{meta.description}[/]")
+
+    if is_copilot:
+        console.print(f"\nFormat: [yellow]copilot[/] — edit {{SPEC_NAME}} inline, use via VS Code Copilot Chat\n")
+        return
 
     if meta.variables:
         table = Table(show_header=True)

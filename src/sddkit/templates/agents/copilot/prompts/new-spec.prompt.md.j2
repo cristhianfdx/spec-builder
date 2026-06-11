@@ -1,0 +1,29 @@
+---
+name: new-spec
+description: Create a new spec (spec.md + plan.md + tasks.md) for a given feature.
+---
+
+Configuration:
+- FEATURE_NAME: my-feature
+
+Objective: Create a complete spec for {FEATURE_NAME} following SDD methodology.
+
+Mandatory reading order:
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. All existing specs in .specify/specs/
+
+Execution flow:
+1. Count existing folders in .specify/specs/ to get the next number.
+2. Create .specify/specs/<NNN>-<slug>/
+3. Create spec.md, plan.md, tasks.md inside.
+
+spec.md: status, dependencies, context, objective, normative reference, acceptance criteria, out of scope.
+plan.md: architecture, module responsibilities, technical decisions, no normative duplication.
+tasks.md: checkbox list (- [ ]), atomic tasks mapping 1:1 to criteria.
+
+Required output:
+1. Spec folder and files created.
+2. Acceptance criteria summary.
+3. Task count.
+4. Open questions (if any).
