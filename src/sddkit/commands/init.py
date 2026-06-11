@@ -5,7 +5,7 @@ Usage:
   sdd init                              # interactive
   sdd init my-project                   # creates ./my-project/
   sdd init --here                       # initializes in current directory
-  sdd init --here --agent claude-code --profile full
+  sdd init my-project --agent claude-code --profile full
 """
 
 from __future__ import annotations
@@ -14,15 +14,16 @@ import re
 import stat
 from pathlib import Path
 from datetime import date
+from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
+from jinja2 import Environment, StrictUndefined
 
 from sddkit.agents.registry import list_agents, get_agent, AgentFile
 from sddkit.engines.template import _templates_dir
 
-init_app = typer.Typer(invoke_without_command=True, no_args_is_help=False)
 console = Console()
 
 PROFILES = ["basic", "standard", "full"]
@@ -32,17 +33,15 @@ def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9-]", "-", text.lower().strip()).strip("-")
 
 
+def _render(template_path: Path, ctx: dict) -> str:
+    env = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
+    return env.from_string(template_path.read_text(encoding="utf-8")).render(**ctx)
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
     console.print(f"  [green]created[/] {path}")
-
-
-def _render(template_path: Path, ctx: dict) -> str:
-    """Render a Jinja2 template file with the given context."""
-    from jinja2 import Environment, StrictUndefined
-    env = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
-    return env.from_string(template_path.read_text(encoding="utf-8")).render(**ctx)
 
 
 def scaffold(project_root: Path, project_name: str, agent_name: str, profile: str) -> None:
@@ -57,19 +56,19 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
     tpl_root = _templates_dir()
     agent_tpl = tpl_root / "agents" / agent_name
 
-    # ── .specify/memory/constitution.md ──────────────────────────────────────
+    # .specify/memory/constitution.md
     _write(
         project_root / ".specify" / "memory" / "constitution.md",
         _render(tpl_root / "constitution.md.j2", ctx),
     )
 
-    # ── First spec skeleton ───────────────────────────────────────────────────
+    # First spec skeleton
     spec_dir = project_root / ".specify" / "specs" / "001-initial-setup"
     _write(spec_dir / "spec.md", _render(tpl_root / "spec.md.j2", {**ctx, "spec_name": "Initial Setup", "spec_number": "001"}))
     _write(spec_dir / "plan.md", _render(tpl_root / "plan.md.j2", {**ctx, "spec_name": "Initial Setup"}))
     _write(spec_dir / "tasks.md", _render(tpl_root / "tasks.md.j2", ctx))
 
-    # ── .specify/prompts/ (sdd-format, raw copy) ──────────────────────────────
+    # .specify/prompts/ — sdd-format, raw copy (contain user-facing {{ }} variables)
     prompts_src = tpl_root / "prompts"
     prompts_dir = project_root / ".specify" / "prompts"
     for prompt_tpl in ["execute-spec.md.j2", "sync-agent.md.j2", "new-spec.md.j2"]:
@@ -81,14 +80,14 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
     custom_keep.parent.mkdir(parents=True, exist_ok=True)
     custom_keep.write_text("", encoding="utf-8")
 
-    # ── .specify/scripts/ ─────────────────────────────────────────────────────
-    scripts_dir = project_root / ".specify" / "scripts"
+    # .specify/scripts/
     scripts_src = tpl_root / "scripts"
+    scripts_dir = project_root / ".specify" / "scripts"
     for script_tpl, executable in [
-        ("new-spec.sh.j2",   True),
-        ("new-spec.ps1.j2",  False),
-        ("validate.sh.j2",   True),
-        ("validate.ps1.j2",  False),
+        ("new-spec.sh.j2",  True),
+        ("new-spec.ps1.j2", False),
+        ("validate.sh.j2",  True),
+        ("validate.ps1.j2", False),
     ]:
         dest_name = script_tpl.replace(".j2", "")
         dest = scripts_dir / dest_name
@@ -96,10 +95,8 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
         if executable:
             dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
-    # ── Agent-specific files (profile-based) ──────────────────────────────────
-    files: list[AgentFile] = agent.files_for_profile(profile)
-
-    for af in files:
+    # Agent-specific files (profile-based)
+    for af in agent.files_for_profile(profile):
         src = agent_tpl / af.src
         dst = project_root / af.dst
 
@@ -113,29 +110,25 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
         if af.executable:
             dst.chmod(dst.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
-    # ── AGENTS.md (always, unless agent already wrote it) ─────────────────────
+    # AGENTS.md (always, unless agent already generates it)
     agents_md = project_root / "AGENTS.md"
     if not agents_md.exists():
         generic_tpl = tpl_root / "agents" / "generic" / "AGENTS.md.j2"
         _write(agents_md, _render(generic_tpl, {**ctx, "specs": []}))
 
-    # ── .gitignore ────────────────────────────────────────────────────────────
+    # .gitignore
     gitignore = project_root / ".gitignore"
     if not gitignore.exists():
         _write(gitignore, "# spec-builder\n.specify/prompts/custom/\n")
 
 
-@init_app.callback(invoke_without_command=True)
-def init(
-    ctx: typer.Context,
-    project: str = typer.Argument(None, help="Project name / folder to create"),
+def init_command(
+    project: Optional[str] = typer.Argument(None, help="Project name / folder to create"),
     here: bool = typer.Option(False, "--here", help="Initialize in the current directory"),
-    agent: str = typer.Option(None, "--agent", "-a", help="Agent to use"),
-    profile: str = typer.Option(None, "--profile", "-p", help="Profile: basic, standard (default), full"),
+    agent: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent to use"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile: basic, standard (default), full"),
 ) -> None:
     """Initialize a new or existing project with SDD structure."""
-    if ctx.invoked_subcommand is not None:
-        return
 
     console.print("\n[bold cyan]sdd init[/] — Spec-Driven Development setup\n")
 

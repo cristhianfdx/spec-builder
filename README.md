@@ -8,13 +8,13 @@ Instead of prompting your AI agent directly with "build me X", spec-builder give
 constitution.md → spec.md → plan.md → tasks.md → code
 ```
 
-Works with Claude Code, GitHub Copilot, Cursor, Gemini CLI, or any agent that reads Markdown files.
+Works with Claude Code, GitHub Copilot, Cursor, Gemini CLI, Windsurf, Aider, or any agent that reads Markdown files.
 
 ---
 
 ## Why spec-builder?
 
-Most AI coding agents are treated like search engines — you describe something and hope for the best. Spec-builder treats them like literal-minded pair programmers that need unambiguous instructions.
+Most AI coding agents are treated like search engines — you describe something and hope for the best. spec-builder treats them like literal-minded pair programmers that need unambiguous instructions.
 
 Key differences from [spec-kit](https://github.com/github/spec-kit):
 
@@ -23,7 +23,8 @@ Key differences from [spec-kit](https://github.com/github/spec-kit):
 | Prompts | Static per agent | Custom with variables + frontmatter |
 | Scripts | Bash only | `.sh` + `.ps1` generated in parallel |
 | Platform | Mac / Linux focused | Mac, Linux, Windows |
-| Default agent | GitHub Copilot | Interactive on init, switchable anytime |
+| Agent profiles | One size fits all | `basic` / `standard` / `full` per agent |
+| Sub-agents | Not available | Reviewer, Debugger, Scaffolder (Claude Code) |
 | Prompt runner | Not available | `sdd prompt run` renders to stdout or clipboard |
 
 ---
@@ -31,20 +32,20 @@ Key differences from [spec-kit](https://github.com/github/spec-kit):
 ## Requirements
 
 - **Python 3.11+**
-- **[uv](https://github.com/astral-sh/uv)** — recommended installer
+- **[uv](https://github.com/astral-sh/uv)**
 
 > **Why Python?**
-> spec-builder is a Python CLI distributed as a package. Python 3.11+ ships on most systems and `uv` eliminates the need to manage virtual environments or worry about `pip` conflicts. You install once with `uv tool install` and get a global `sdd` command — no Node.js, no Ruby, no additional runtimes required.
+> spec-builder is a Python CLI distributed as a package. `uv` eliminates the need to manage virtual environments or worry about `pip` conflicts. You install once and get a global `sdd` command — no Node.js, no Ruby, no additional runtimes required.
 
 ### Install Python
 
 | Platform | Instructions |
 |---|---|
-| **macOS** | `brew install python@3.11` or download from [python.org](https://www.python.org/downloads/) |
-| **Linux** | `sudo apt install python3.11` (Debian/Ubuntu) or `sudo dnf install python3.11` (Fedora) |
-| **Windows** | Download from [python.org](https://www.python.org/downloads/) — check "Add Python to PATH" during install |
+| **macOS** | `brew install python@3.11` or [python.org](https://www.python.org/downloads/) |
+| **Linux** | `sudo apt install python3.11` (Debian/Ubuntu) · `sudo dnf install python3.11` (Fedora) |
+| **Windows** | [python.org](https://www.python.org/downloads/) — check "Add Python to PATH" during install |
 
-Verify: `python --version` or `python3 --version` should print `3.11.x` or higher.
+Verify: `python --version` should print `3.11.x` or higher.
 
 ### Install uv
 
@@ -62,41 +63,56 @@ Verify: `uv --version`
 
 ## Installation
 
-```bash
-# Install globally (recommended)
-uv tool install spec-builder --from git+https://github.com/cristhianfdx/spec-builder.git
+Install globally — no cloning required:
 
-# Or run without installing (one-shot)
-uvx --from git+https://github.com/cristhianfdx/spec-builder.git sdd init my-project
+```bash
+uv tool install git+https://github.com/cristhianfdx/spec-builder.git
 ```
 
-Verify: `sdd --help`
+Verify:
+
+```bash
+sdd --help
+```
+
+### Update
+
+```bash
+uv tool install git+https://github.com/cristhianfdx/spec-builder.git --force
+```
+
+### Uninstall
+
+```bash
+uv tool uninstall spec-builder
+```
 
 ---
 
 ## Quick Start
 
 ```bash
-# Create a new project
+# Create a new project (interactive)
 sdd init my-project
 
-# Or initialize in an existing project
-cd my-existing-project
-sdd init --here
+# Or non-interactive
+sdd init my-project --agent claude-code --profile full
+
+# Initialize in an existing repo
+cd my-existing-repo
+sdd init --here --agent copilot --profile standard
 
 # Create your first feature spec
+cd my-project
 sdd new user-authentication
 
-# Check structure is valid
+# Validate structure
 sdd check
 
 # List available prompts
 sdd prompt list
 
-# Run a prompt (renders to stdout)
-sdd prompt run execute-spec --var SPEC_NAME=001-initial-setup
-
-# Copy rendered prompt to clipboard
+# Render a prompt and copy to clipboard
 sdd prompt run execute-spec --var SPEC_NAME=001-initial-setup --copy
 ```
 
@@ -106,22 +122,31 @@ sdd prompt run execute-spec --var SPEC_NAME=001-initial-setup --copy
 
 ### `sdd init`
 
-Initialize a new or existing project with the full SDD structure.
+Initialize a new or existing project.
 
 ```bash
-sdd init                          # interactive: asks name, stack, agent
-sdd init my-project               # creates ./my-project/ with SDD structure
-sdd init --here                   # initializes SDD in current directory
-sdd init --here --agent claude-code --stack "Python / FastAPI"
+sdd init                                          # fully interactive
+sdd init my-project                               # creates ./my-project/
+sdd init --here                                   # initializes in current directory
+sdd init my-project --agent claude-code           # skip agent prompt
+sdd init my-project --agent claude-code --profile full   # skip all prompts
 ```
 
-Generated structure:
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--here` | Initialize in the current directory instead of creating a subfolder |
+| `--agent`, `-a` | Agent name (see supported agents below) |
+| `--profile`, `-p` | `basic`, `standard` (default), or `full` |
+
+**Generated structure:**
 
 ```
 my-project/
 ├── .specify/
 │   ├── memory/
-│   │   └── constitution.md       # Immutable project rules
+│   │   └── constitution.md       # Immutable project rules — edit this first
 │   ├── specs/
 │   │   └── 001-initial-setup/
 │   │       ├── spec.md           # What to build (acceptance criteria)
@@ -131,15 +156,17 @@ my-project/
 │   │   ├── execute-spec.md       # Run a spec with your agent
 │   │   ├── sync-agent.md         # Regenerate AGENTS.md
 │   │   ├── new-spec.md           # Create a new spec via agent
-│   │   └── custom/               # Your custom prompts go here
+│   │   └── custom/               # Your custom prompts
 │   └── scripts/
-│       ├── new-spec.sh           # Create spec from terminal (Mac/Linux)
-│       ├── new-spec.ps1          # Create spec from terminal (Windows)
+│       ├── new-spec.sh           # Create spec (Mac/Linux)
+│       ├── new-spec.ps1          # Create spec (Windows)
 │       ├── validate.sh           # Validate structure (Mac/Linux)
 │       └── validate.ps1          # Validate structure (Windows)
-├── AGENTS.md                     # Agent guide (generated by sdd sync)
-└── CLAUDE.md                     # Agent instruction file (varies by agent)
+├── AGENTS.md                     # Agent guide (regenerated by sdd sync)
+└── [agent files]                 # Varies by agent — see below
 ```
+
+---
 
 ### `sdd new <feature-name>`
 
@@ -150,22 +177,24 @@ sdd new manage-users
 sdd new "Payment Processing"      # spaces are auto-slugified
 ```
 
-Auto-numbers the spec: `001-manage-users`, `002-payment-processing`, etc.
+Auto-numbers specs: `001-manage-users`, `002-payment-processing`, etc.
+
+---
 
 ### `sdd prompt`
 
-Manage and run custom prompts.
+Manage and run prompts.
 
 ```bash
-sdd prompt list                                        # list all prompts
-sdd prompt new review-spec                             # scaffold a custom prompt
-sdd prompt new review-spec --description "Review spec completeness"
-sdd prompt run execute-spec --var SPEC_NAME=001-foo    # render a prompt
-sdd prompt run execute-spec --var SPEC_NAME=001-foo --copy  # copy to clipboard
-sdd prompt show execute-spec                           # show metadata + variables
+sdd prompt list                                             # list all prompts
+sdd prompt new review-spec                                  # scaffold a custom prompt (sdd format)
+sdd prompt new review-spec --format copilot                 # scaffold a Copilot .prompt.md
+sdd prompt run execute-spec --var SPEC_NAME=001-my-feature  # render to stdout
+sdd prompt run execute-spec --var SPEC_NAME=001-my-feature --copy   # copy to clipboard
+sdd prompt show execute-spec                                # show metadata + variables
 ```
 
-Custom prompts live in `.specify/prompts/custom/` and use YAML frontmatter to declare variables:
+Custom prompts live in `.specify/prompts/custom/` and use YAML frontmatter:
 
 ```markdown
 ---
@@ -179,28 +208,37 @@ variables:
 agents: [claude-code, copilot]
 ---
 
-Read `.specify/specs/{{ SPEC_NAME }}/spec.md` and do something.
+Read `.specify/specs/{{ SPEC_NAME }}/spec.md` and do the thing.
 ```
+
+---
 
 ### `sdd use <agent>`
 
-Install or switch the agent instruction file.
+Install or switch the agent instruction files in an existing project.
 
 ```bash
-sdd use claude-code    # writes CLAUDE.md
-sdd use copilot        # writes .github/copilot-instructions.md
-sdd use cursor         # writes .cursorrules
-sdd use gemini-cli     # writes GEMINI.md
-sdd use generic        # writes AGENTS.md only
+sdd use claude-code
+sdd use claude-code --profile full
+sdd use copilot --profile standard
+sdd use cursor
+sdd use gemini-cli
+sdd use windsurf
+sdd use aider
+sdd use generic
 ```
+
+---
 
 ### `sdd sync`
 
-Regenerate `AGENTS.md` by scanning `.specify/` and the current project structure.
+Regenerate `AGENTS.md` by scanning `.specify/` and the project structure.
 
 ```bash
 sdd sync
 ```
+
+---
 
 ### `sdd check`
 
@@ -214,15 +252,137 @@ sdd check
 
 ## Supported Agents
 
-| Agent | Instruction file | Command |
-|---|---|---|
-| Claude Code | `CLAUDE.md` | `sdd use claude-code` |
-| GitHub Copilot | `.github/copilot-instructions.md` | `sdd use copilot` |
-| Cursor | `.cursorrules` | `sdd use cursor` |
-| Gemini CLI | `GEMINI.md` | `sdd use gemini-cli` |
-| Generic | `AGENTS.md` | `sdd use generic` |
+### Claude Code
 
-You can switch agents at any time — just run `sdd use <agent>` again.
+| Profile | What gets generated |
+|---|---|
+| `basic` | `CLAUDE.md` + `.claude/settings.json` |
+| `standard` | + hooks (`pre-edit`, `post-edit`, `stop`) as `.sh` and `.ps1` + skills (`run-tests`, `lint`) |
+| `full` | + sub-agents (`reviewer`, `debugger`, `scaffolder`) |
+
+```bash
+sdd init my-project --agent claude-code --profile full
+```
+
+Generated layout:
+
+```
+CLAUDE.md
+.claude/
+  settings.json
+  hooks/
+    pre-edit.sh / pre-edit.ps1
+    post-edit.sh / post-edit.ps1
+    stop.sh / stop.ps1
+  skills/
+    run-tests.md
+    lint.md
+  agents/
+    reviewer.md
+    debugger.md
+    scaffolder.md
+```
+
+**Hooks** run automatically on edit events:
+- `pre-edit` — warns if no pending tasks before editing
+- `post-edit` — placeholder for linter/formatter (uncomment for your stack)
+- `stop` — prints a task summary at end of session
+
+**Skills** are referenced with `/skill <name>` in Claude Code:
+- `run-tests` — detects and runs the appropriate test runner
+- `lint` — detects and runs the appropriate linter/formatter
+
+**Sub-agents** are invoked with `/agent <name>`:
+- `reviewer` — reviews code against spec acceptance criteria
+- `debugger` — diagnoses errors in the context of the active spec
+- `scaffolder` — generates file structure from spec + plan
+
+---
+
+### GitHub Copilot
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `.github/copilot-instructions.md` |
+| `standard` | + `.github/prompts/execute-spec.prompt.md`, `sync-agent.prompt.md`, `new-spec.prompt.md` |
+
+```bash
+sdd init my-project --agent copilot --profile standard
+```
+
+Copilot prompts are used in VS Code by typing `#<prompt-name>` in Copilot Chat.
+Edit `SPEC_NAME` directly in the `.prompt.md` file before running.
+
+To add a custom Copilot prompt:
+
+```bash
+sdd prompt new my-prompt --format copilot
+# → creates .github/prompts/my-prompt.prompt.md
+```
+
+---
+
+### Cursor
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `.cursorrules` |
+| `standard` | + `.cursor/rules/sdd.mdc` |
+
+```bash
+sdd init my-project --agent cursor --profile standard
+```
+
+---
+
+### Gemini CLI
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `GEMINI.md` |
+| `standard` | + `GEMINI_TOOLS.md` |
+
+```bash
+sdd init my-project --agent gemini-cli --profile standard
+```
+
+---
+
+### Windsurf
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `.windsurfrules` |
+
+```bash
+sdd init my-project --agent windsurf
+```
+
+---
+
+### Aider
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `.aider.conf.yml` + `CONVENTIONS.md` |
+
+```bash
+sdd init my-project --agent aider
+```
+
+---
+
+### Generic
+
+Works with any agent that reads Markdown files.
+
+| Profile | What gets generated |
+|---|---|
+| `basic` | `AGENTS.md` |
+
+```bash
+sdd init my-project --agent generic
+```
 
 ---
 
@@ -230,7 +390,7 @@ You can switch agents at any time — just run `sdd use <agent>` again.
 
 ### 1. Constitution first
 
-Edit `.specify/memory/constitution.md` to define your project's immutable rules: stack, allowed technologies, forbidden patterns, domain entities, file structure. This is the highest source of truth — no spec can contradict it.
+Edit `.specify/memory/constitution.md` to define your project's immutable rules: allowed stack, forbidden patterns, domain entities, file structure. This is the highest source of truth — no spec can contradict it.
 
 ### 2. One spec per feature
 
@@ -241,21 +401,23 @@ Run `sdd new <feature>` for each business capability. Fill in:
 
 ### 3. Point your agent at the spec
 
-Use a prompt to give your agent clear context:
+Render a prompt and give it to your agent:
 
 ```bash
 sdd prompt run execute-spec --var SPEC_NAME=001-manage-users --copy
 ```
 
-Paste the rendered prompt into your agent. It will read the spec documents, implement only pending tasks, and mark them complete.
+The agent will read the spec documents, implement only pending tasks, and mark them complete.
 
 ### 4. Keep AGENTS.md up to date
 
-Run `sdd sync` after completing specs. This regenerates the summary guide that helps any agent understand the project quickly.
+```bash
+sdd sync
+```
 
 ### Conflict resolution
 
-In case of contradiction: `constitution.md` > `spec.md` > `plan.md`
+`constitution.md` > `spec.md` > `plan.md`
 
 ---
 
@@ -271,63 +433,6 @@ If you prefer not to use the CLI, the generated scripts in `.specify/scripts/` w
 # Windows (PowerShell)
 .\.specify\scripts\new-spec.ps1 "payment-processing"
 .\.specify\scripts\validate.ps1
-```
-
----
-
-## Project Structure (this repo)
-
-```
-spec-builder/
-├── src/
-│   └── sddkit/
-│       ├── cli.py                # Entry point: sdd
-│       ├── commands/
-│       │   ├── init.py           # sdd init
-│       │   ├── new.py            # sdd new
-│       │   ├── prompt.py         # sdd prompt
-│       │   ├── use.py            # sdd use
-│       │   ├── sync.py           # sdd sync
-│       │   └── check.py          # sdd check
-│       ├── engines/
-│       │   ├── template.py       # Jinja2 template renderer
-│       │   └── prompt.py         # Prompt frontmatter parser + renderer
-│       └── agents/
-│           ├── registry.py       # Agent definitions
-│           └── resolver.py       # Auto-detects active agent
-├── templates/
-│   ├── constitution.md.j2
-│   ├── spec.md.j2
-│   ├── plan.md.j2
-│   ├── tasks.md.j2
-│   ├── prompts/
-│   │   ├── execute-spec.md.j2
-│   │   ├── sync-agent.md.j2
-│   │   └── new-spec.md.j2
-│   ├── agents/
-│   │   ├── claude-code.md.j2
-│   │   ├── copilot.md.j2
-│   │   ├── cursor.md.j2
-│   │   ├── gemini-cli.md.j2
-│   │   └── generic.md.j2
-│   └── scripts/
-│       ├── new-spec.sh.j2
-│       ├── new-spec.ps1.j2
-│       ├── validate.sh.j2
-│       └── validate.ps1.j2
-└── pyproject.toml
-```
-
----
-
-## Development
-
-```bash
-# Clone and install in editable mode
-git clone https://github.com/cristhianfdx/spec-builder.git
-cd spec-builder
-uv sync
-uv run sdd --help
 ```
 
 ---

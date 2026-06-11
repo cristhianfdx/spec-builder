@@ -14,10 +14,8 @@ from datetime import date
 
 import typer
 from rich.console import Console
+from jinja2 import Environment, StrictUndefined
 
-from sddkit.engines.template import render
-
-new_app = typer.Typer(invoke_without_command=True, no_args_is_help=False)
 console = Console()
 
 
@@ -43,8 +41,12 @@ def _write(path: Path, content: str) -> None:
     console.print(f"  [green]created[/] {path.relative_to(Path.cwd())}")
 
 
+def _render(template_path: Path, ctx: dict) -> str:
+    env = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
+    return env.from_string(template_path.read_text(encoding="utf-8")).render(**ctx)
+
+
 def _find_project_root(start: Path) -> Path:
-    """Walk up until we find a .specify/ directory."""
     current = start
     for _ in range(10):
         if (current / ".specify").exists():
@@ -53,14 +55,11 @@ def _find_project_root(start: Path) -> Path:
     return start
 
 
-@new_app.callback(invoke_without_command=True)
-def new(
-    ctx: typer.Context,
+def new_command(
     name: str = typer.Argument(..., help="Feature name, e.g. 'manage-users' or 'User Authentication'"),
 ) -> None:
     """Create a new spec folder with spec.md, plan.md, and tasks.md."""
-    if ctx.invoked_subcommand is not None:
-        return
+    from sddkit.engines.template import _templates_dir
 
     project_root = _find_project_root(Path.cwd())
     specs_dir = project_root / ".specify" / "specs"
@@ -74,7 +73,8 @@ def new(
         console.print(f"[red]Spec folder already exists:[/] {spec_dir}")
         raise typer.Exit(1)
 
-    ctx_data = {
+    tpl_root = _templates_dir()
+    ctx = {
         "spec_name": name,
         "spec_number": number,
         "spec_slug": slug,
@@ -82,13 +82,13 @@ def new(
     }
 
     console.print(f"\n[bold cyan]sdd new[/] — creating spec [bold]{folder_name}[/]\n")
-    _write(spec_dir / "spec.md", render("spec.md.j2", ctx_data))
-    _write(spec_dir / "plan.md", render("plan.md.j2", ctx_data))
-    _write(spec_dir / "tasks.md", render("tasks.md.j2", ctx_data))
+    _write(spec_dir / "spec.md", _render(tpl_root / "spec.md.j2", ctx))
+    _write(spec_dir / "plan.md", _render(tpl_root / "plan.md.j2", ctx))
+    _write(spec_dir / "tasks.md", _render(tpl_root / "tasks.md.j2", ctx))
 
     console.print(f"\n[bold green]Done![/] Spec created at [cyan].specify/specs/{folder_name}/[/]")
     console.print("\nNext steps:")
-    console.print(f"  1. Fill in [bold]spec.md[/] with acceptance criteria")
-    console.print(f"  2. Define the technical approach in [bold]plan.md[/]")
-    console.print(f"  3. Break down work into checkboxes in [bold]tasks.md[/]")
-    console.print(f"  4. Point your agent at the spec and run it\n")
+    console.print("  1. Fill in [bold]spec.md[/] with acceptance criteria")
+    console.print("  2. Define the technical approach in [bold]plan.md[/]")
+    console.print("  3. Break down work into checkboxes in [bold]tasks.md[/]")
+    console.print("  4. Point your agent at the spec and run it\n")
