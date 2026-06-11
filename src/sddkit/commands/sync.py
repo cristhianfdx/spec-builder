@@ -4,12 +4,20 @@ sdd sync — regenerate AGENTS.md from the current project state.
 
 from pathlib import Path
 from datetime import date
+
 import typer
 from rich.console import Console
-from sddkit.engines.template import render
+from jinja2 import Environment, StrictUndefined
+
+from sddkit.engines.template import _templates_dir
 from sddkit.agents.resolver import detect_agent
 
 console = Console()
+
+
+def _render(template_path: Path, ctx: dict) -> str:
+    env = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
+    return env.from_string(template_path.read_text(encoding="utf-8")).render(**ctx)
 
 
 def sync_command() -> None:
@@ -30,16 +38,21 @@ def sync_command() -> None:
     specs = []
     if specs_dir.exists():
         for spec_dir in sorted(d for d in specs_dir.iterdir() if d.is_dir()):
-            spec_file = spec_dir / "spec.md"
             tasks_file = spec_dir / "tasks.md"
             total = done = 0
             if tasks_file.exists():
                 for line in tasks_file.read_text(encoding="utf-8").splitlines():
-                    if line.strip().startswith("- ["):
+                    stripped = line.strip()
+                    if stripped.startswith("- ["):
                         total += 1
-                        if line.strip().startswith("- [x]"):
+                        if stripped.startswith("- [x]"):
                             done += 1
-            status = "complete" if total > 0 and done == total else "in progress" if done > 0 else "pending"
+            if total > 0 and done == total:
+                status = "complete"
+            elif done > 0:
+                status = "in progress"
+            else:
+                status = "pending"
             specs.append({
                 "folder": spec_dir.name,
                 "total_tasks": total,
@@ -47,6 +60,7 @@ def sync_command() -> None:
                 "status": status,
             })
 
+    # Resolve project name from constitution
     constitution = specify_dir / "memory" / "constitution.md"
     project_name = project_root.name
     if constitution.exists():
@@ -63,7 +77,9 @@ def sync_command() -> None:
         "date": date.today().isoformat(),
     }
 
-    content = render("agents/generic.md.j2", ctx)
+    tpl = _templates_dir() / "agents" / "generic" / "AGENTS.md.j2"
+    content = _render(tpl, ctx)
+
     dest = project_root / "AGENTS.md"
     dest.write_text(content, encoding="utf-8", newline="\n")
     console.print(f"\n[bold green]Synced[/] AGENTS.md — {len(specs)} spec(s) indexed.\n")
