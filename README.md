@@ -156,6 +156,7 @@ my-project/
 │   │   ├── execute-spec.md       # Run a spec with your agent
 │   │   ├── sync-agent.md         # Regenerate AGENTS.md
 │   │   ├── new-spec.md           # Create a new spec via agent
+│   │   ├── update-constitution.md # Update the constitution via agent
 │   │   └── custom/               # Your custom prompts
 │   └── scripts/
 │       ├── new-spec.sh           # Create spec (Mac/Linux)
@@ -210,6 +211,27 @@ agents: [claude-code, copilot]
 
 Read `.specify/specs/{{ SPEC_NAME }}/spec.md` and do the thing.
 ```
+
+#### Built-in prompts
+
+| Prompt | Description | Variables |
+|---|---|---|
+| `execute-spec` | Run a full spec through the SDD workflow | `SPEC_NAME`* |
+| `new-spec` | Create a new spec (spec + plan + tasks) | `FEATURE_NAME`* |
+| `sync-agent` | Regenerate AGENTS.md from project state | — |
+| `update-constitution` | Update the constitution based on a requested change | `CHANGE_REQUEST`* |
+
+**Example: updating the constitution**
+
+```bash
+# Add a new rule to the constitution
+sdd prompt run update-constitution --var CHANGE_REQUEST="Add rate limiting to all public endpoints"
+
+# Change the tech stack
+sdd prompt run update-constitution --var CHANGE_REQUEST="Replace PostgreSQL with SQLite for local development"
+```
+
+The agent will read the current constitution, apply only the requested change, flag any conflicts with existing rules, and report which specs may be affected.
 
 ---
 
@@ -391,6 +413,12 @@ sdd init my-project --agent generic
 ### 1. Constitution first
 
 Edit `.specify/memory/constitution.md` to define your project's immutable rules: allowed stack, forbidden patterns, domain entities, file structure. This is the highest source of truth — no spec can contradict it.
+
+To update the constitution via your agent instead of editing manually:
+
+```bash
+sdd prompt run update-constitution --var CHANGE_REQUEST="Add a new rule or change"
+```
 
 ### 2. One spec per feature
 

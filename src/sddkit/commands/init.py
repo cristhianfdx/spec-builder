@@ -71,7 +71,7 @@ def scaffold(project_root: Path, project_name: str, agent_name: str, profile: st
     # .specify/prompts/ — sdd-format, raw copy (contain user-facing {{ }} variables)
     prompts_src = tpl_root / "prompts"
     prompts_dir = project_root / ".specify" / "prompts"
-    for prompt_tpl in ["execute-spec.md.j2", "sync-agent.md.j2", "new-spec.md.j2"]:
+    for prompt_tpl in ["execute-spec.md.j2", "sync-agent.md.j2", "new-spec.md.j2", "update-constitution.md.j2"]:
         dest_name = prompt_tpl.replace(".j2", "")
         _write(prompts_dir / dest_name, (prompts_src / prompt_tpl).read_text(encoding="utf-8"))
 
