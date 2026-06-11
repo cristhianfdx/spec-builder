@@ -1,6 +1,6 @@
 ---
 name: execute-spec
-description: Run a full spec through the SDD workflow (specify → plan → tasks → implement)
+description: Run a spec through the SDD workflow. Auto-advances to the next pending spec if the given one is already complete.
 variables:
   - name: SPEC_NAME
     description: Spec folder name inside .specify/specs/ (e.g. 001-create-foundation)
@@ -15,39 +15,101 @@ agents: [claude-code, copilot, cursor, gemini-cli, generic]
 
 **Agent:** {{ AGENT }}
 
-## Path Resolution
+## Phase 0 — Resolve Active Spec
 
-- SPEC_DIR = `.specify/specs/{{ SPEC_NAME }}`
-- SPEC_FILE = `.specify/specs/{{ SPEC_NAME }}/spec.md`
-- PLAN_FILE = `.specify/specs/{{ SPEC_NAME }}/plan.md`
-- TASKS_FILE = `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+Before doing anything else, determine the actual spec to execute:
 
-## Mandatory Reading Order
+1. Read `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+2. Count pending tasks (`- [ ]`) and completed tasks (`- [x]`)
+3. Apply this logic:
+
+```
+IF all tasks are [x] (or no pending tasks exist):
+  → This spec is COMPLETE. Do not re-implement it.
+  → Scan .specify/specs/ in numeric order (001, 002, 003...)
+  → Find the first spec folder that has at least one pending task (- [ ])
+  → Set ACTIVE_SPEC = that folder name
+  → Announce: "Spec {{ SPEC_NAME }} is complete. Advancing to <ACTIVE_SPEC>."
+
+ELSE:
+  → Set ACTIVE_SPEC = {{ SPEC_NAME }}
+  → Announce: "Executing spec {{ SPEC_NAME }} — <N> pending tasks found."
+
+IF no pending spec is found anywhere in .specify/specs/:
+  → Announce: "All specs are complete. Running consistency check."
+  → Go to Phase 4 (Consistency Check) using the last spec as context.
+  → Stop after the check. Do not implement anything.
+```
+
+All subsequent phases use ACTIVE_SPEC, not {{ SPEC_NAME }}.
+
+---
+
+## Phase 1 — Mandatory Reading Order
 
 Read each document fully before taking any action:
 
 1. `.specify/memory/constitution.md`
-2. `.specify/specs/{{ SPEC_NAME }}/spec.md`
-3. `.specify/specs/{{ SPEC_NAME }}/plan.md`
-4. `.specify/specs/{{ SPEC_NAME }}/tasks.md`
+2. `.specify/specs/<ACTIVE_SPEC>/spec.md`
+3. `.specify/specs/<ACTIVE_SPEC>/plan.md`
+4. `.specify/specs/<ACTIVE_SPEC>/tasks.md`
 
-Use these documents as the sole source of truth for all work in this session.
+These documents are the sole source of truth for this session.
 
-## Execution Rules
+---
 
-1. Before creating or editing any file, inspect the current state of the codebase and `tasks.md`. Respect what is already implemented.
-2. Execute only pending checks (`- [ ]`) in `tasks.md`, in sequence.
-3. Mark each check as `- [x]` only when it is truly complete.
-4. Only create or extend files within the structure defined by the active spec.
-5. Do not introduce patterns, dependencies, or files prohibited by the constitution.
-6. Stop only if there is a real ambiguity or contradiction between documents.
+## Phase 2 — Pre-flight Check
+
+Before touching any file:
+
+1. Inspect the current codebase state relevant to ACTIVE_SPEC.
+2. Identify which pending tasks (`- [ ]`) may already be partially or fully implemented.
+3. For any task that appears already implemented, verify it fully satisfies the corresponding acceptance criterion in `spec.md` before marking it `[x]`.
+4. Do not re-implement what already exists correctly.
+
+---
+
+## Phase 3 — Execution
+
+1. Execute pending tasks (`- [ ]`) from `tasks.md` in sequence.
+2. Mark each task `[x]` only when it is truly and fully complete.
+3. Only create or modify files within the scope defined by `spec.md` and `plan.md`.
+4. Do not introduce patterns, dependencies, or files prohibited by `constitution.md`.
+5. Stop and surface the ambiguity if there is a real contradiction between documents.
+
+---
+
+## Phase 4 — Consistency Check (runs when spec is complete)
+
+When ACTIVE_SPEC was resolved by auto-advance OR when all specs are done:
+
+1. Verify each acceptance criterion in `spec.md` against the actual code.
+2. Verify the implemented structure matches `plan.md` decisions.
+3. Verify no `- [ ]` tasks remain in `tasks.md`.
+4. Verify no code contradicts `constitution.md`.
+
+Report any inconsistency found. Do not silently pass a failing check.
+
+---
 
 ## Required Output
 
-After finishing (or stopping), report:
+```
+Active spec : <ACTIVE_SPEC>
+Reason      : [executing | auto-advanced from {{ SPEC_NAME }} | all complete]
 
-1. What was built or modified.
-2. Which files were created or changed.
-3. Which tasks in `tasks.md` are now marked complete.
-4. What remains pending (if any).
-5. Which dependent specs can now advance.
+Tasks completed this session:
+  - [x] <task text>
+
+Tasks remaining:
+  - [ ] <task text>   (or "none")
+
+Files created or modified:
+  - <path>
+
+Consistency check: PASSED | FAILED (<reason if failed>)
+
+Next action:
+  - Run execute-spec again with SPEC_NAME=<next pending spec>   (if tasks remain)
+  - All specs complete — run `sdd sync` to update AGENTS.md     (if all done)
+```

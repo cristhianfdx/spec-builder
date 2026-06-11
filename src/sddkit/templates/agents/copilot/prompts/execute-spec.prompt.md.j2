@@ -1,41 +1,73 @@
 ---
 name: execute-spec
-description: Run a full spec through the SDD workflow. Change SPEC_NAME and run.
+description: Run a spec through the SDD workflow. Auto-advances to the next pending spec if the given one is already complete.
 ---
 
 Configuration:
 - SPEC_NAME: 001-initial-setup
 
-Path resolution:
-- SPEC_DIR = .specify/specs/{SPEC_NAME}
-- SPEC_FILE = {SPEC_DIR}/spec.md
-- PLAN_FILE = {SPEC_DIR}/plan.md
-- TASKS_FILE = {SPEC_DIR}/tasks.md
+## Phase 0 — Resolve Active Spec
 
-Mandatory reading order:
+Before doing anything else, determine the actual spec to execute:
+
+1. Read .specify/specs/{SPEC_NAME}/tasks.md
+2. Count pending (- [ ]) and completed (- [x]) tasks
+3. Apply this logic:
+
+If all tasks are [x]:
+  - This spec is COMPLETE. Do not re-implement it.
+  - Scan .specify/specs/ in numeric order (001, 002, 003...)
+  - Find the first spec with at least one pending task (- [ ])
+  - Set ACTIVE_SPEC = that folder
+  - Announce: "Spec {SPEC_NAME} is complete. Advancing to <ACTIVE_SPEC>."
+
+If pending tasks exist:
+  - Set ACTIVE_SPEC = {SPEC_NAME}
+  - Announce: "Executing {SPEC_NAME} — <N> pending tasks found."
+
+If no pending spec exists anywhere:
+  - Announce: "All specs complete. Running consistency check."
+  - Go to Phase 4. Stop after check.
+
+All subsequent phases use ACTIVE_SPEC.
+
+## Phase 1 — Mandatory Reading Order
 
 1. .github/copilot-instructions.md
 2. .specify/memory/constitution.md
-3. {SPEC_FILE}
-4. {PLAN_FILE}
-5. {TASKS_FILE}
+3. .specify/specs/<ACTIVE_SPEC>/spec.md
+4. .specify/specs/<ACTIVE_SPEC>/plan.md
+5. .specify/specs/<ACTIVE_SPEC>/tasks.md
 
-Use these documents as the sole source of truth for all work in this session.
+## Phase 2 — Pre-flight Check
 
-Execution rules:
+1. Inspect codebase state relevant to ACTIVE_SPEC.
+2. Identify pending tasks that may already be partially implemented.
+3. Verify before marking [x] — do not re-implement what already exists correctly.
 
-1. Before creating or editing any file, inspect the current codebase and {TASKS_FILE}. Respect what is already implemented.
-2. Execute only pending checks (- [ ]) in {TASKS_FILE}, in sequence.
-3. Mark each check in {TASKS_FILE} as - [x] only when it is truly complete.
-4. Only create or extend files within the structure defined by the active spec.
-5. Do not introduce patterns, dependencies, or files prohibited by the constitution.
-6. Stop only if there is a real ambiguity or contradiction between documents.
+## Phase 3 — Execution
 
-Required output when done:
+1. Execute pending tasks (- [ ]) in sequence.
+2. Mark [x] only when truly complete.
+3. Only modify files within scope defined by spec.md and plan.md.
+4. Do not introduce anything prohibited by constitution.md.
+5. Stop and surface any contradiction between documents.
 
-1. What was built or modified.
-2. Which files were created or changed.
-3. Which tasks in {TASKS_FILE} are now marked complete.
-4. Update the Status section in {SPEC_FILE} to "implement".
-5. What remains pending (if any).
-6. Which dependent specs can now advance.
+## Phase 4 — Consistency Check
+
+1. Verify each acceptance criterion in spec.md against actual code.
+2. Verify implemented structure matches plan.md decisions.
+3. Verify no (- [ ]) tasks remain.
+4. Verify no code contradicts constitution.md.
+Report any inconsistency. Do not silently pass a failing check.
+
+## Required Output
+
+Active spec : <ACTIVE_SPEC>
+Reason      : [executing | auto-advanced from {SPEC_NAME} | all complete]
+
+Tasks completed this session: <list>
+Tasks remaining: <list or "none">
+Files created or modified: <list>
+Consistency check: PASSED | FAILED (<reason>)
+Next action: <run execute-spec with next spec | run sdd sync>
