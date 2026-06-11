@@ -10,8 +10,7 @@ Profile levels:
 Each AgentFile describes one file to generate:
   - src: template path relative to templates/agents/<agent-name>/
   - dst: destination path relative to project root
-  - raw: if True, copy as-is without Jinja2 rendering (e.g. prompt files
-         that contain user-facing {VARIABLE} syntax)
+  - raw: if True, copy as-is without Jinja2 rendering
   - executable: if True, chmod +x on Unix after writing
 """
 
@@ -22,8 +21,8 @@ from dataclasses import dataclass, field
 
 @dataclass
 class AgentFile:
-    src: str          # template path inside templates/agents/<agent>/
-    dst: str          # destination path inside project root
+    src: str
+    dst: str
     raw: bool = False
     executable: bool = False
 
@@ -32,13 +31,11 @@ class AgentFile:
 class AgentConfig:
     name: str
     display_name: str
-    # Files generated at each profile level (cumulative: full includes standard includes basic)
     basic: list[AgentFile] = field(default_factory=list)
     standard: list[AgentFile] = field(default_factory=list)
     full: list[AgentFile] = field(default_factory=list)
 
     def files_for_profile(self, profile: str) -> list[AgentFile]:
-        """Return all files for a given profile (cumulative)."""
         files = list(self.basic)
         if profile in ("standard", "full"):
             files += self.standard
@@ -48,12 +45,10 @@ class AgentConfig:
 
     @property
     def instruction_path(self) -> str:
-        """The primary instruction file path (first file in basic)."""
         return self.basic[0].dst if self.basic else "AGENTS.md"
 
     @property
     def extra_dirs(self) -> list[str]:
-        """Directories to pre-create (derived from all file destinations)."""
         dirs = set()
         for f in self.basic + self.standard + self.full:
             parent = "/".join(f.dst.split("/")[:-1])
@@ -64,7 +59,7 @@ class AgentConfig:
 
 AGENTS: dict[str, AgentConfig] = {
 
-    # ── Claude Code ──────────────────────────────────────────────────────────
+    # ── Claude Code ───────────────────────────────────────────────────────────
     "claude-code": AgentConfig(
         name="claude-code",
         display_name="Claude Code",
@@ -73,14 +68,14 @@ AGENTS: dict[str, AgentConfig] = {
             AgentFile("settings.json.j2",        ".claude/settings.json"),
         ],
         standard=[
-            AgentFile("hooks/pre-edit.sh.j2",    ".claude/hooks/pre-edit.sh",   executable=True),
-            AgentFile("hooks/pre-edit.ps1.j2",   ".claude/hooks/pre-edit.ps1"),
-            AgentFile("hooks/post-edit.sh.j2",   ".claude/hooks/post-edit.sh",  executable=True),
-            AgentFile("hooks/post-edit.ps1.j2",  ".claude/hooks/post-edit.ps1"),
-            AgentFile("hooks/stop.sh.j2",        ".claude/hooks/stop.sh",       executable=True),
-            AgentFile("hooks/stop.ps1.j2",       ".claude/hooks/stop.ps1"),
-            AgentFile("skills/run-tests.md.j2",  ".claude/skills/run-tests.md"),
-            AgentFile("skills/lint.md.j2",       ".claude/skills/lint.md"),
+            AgentFile("hooks/pre-edit.sh.j2",   ".claude/hooks/pre-edit.sh",  executable=True),
+            AgentFile("hooks/pre-edit.ps1.j2",  ".claude/hooks/pre-edit.ps1"),
+            AgentFile("hooks/post-edit.sh.j2",  ".claude/hooks/post-edit.sh", executable=True),
+            AgentFile("hooks/post-edit.ps1.j2", ".claude/hooks/post-edit.ps1"),
+            AgentFile("hooks/stop.sh.j2",       ".claude/hooks/stop.sh",      executable=True),
+            AgentFile("hooks/stop.ps1.j2",      ".claude/hooks/stop.ps1"),
+            AgentFile("skills/run-tests.md.j2", ".claude/skills/run-tests.md"),
+            AgentFile("skills/lint.md.j2",      ".claude/skills/lint.md"),
         ],
         full=[
             AgentFile("agents/reviewer.md.j2",   ".claude/agents/reviewer.md"),
@@ -97,10 +92,13 @@ AGENTS: dict[str, AgentConfig] = {
             AgentFile("copilot-instructions.md.j2", ".github/copilot-instructions.md"),
         ],
         standard=[
-            AgentFile("prompts/execute-spec.prompt.md.j2", ".github/prompts/execute-spec.prompt.md", raw=True),
-            AgentFile("prompts/sync-agent.prompt.md.j2",   ".github/prompts/sync-agent.prompt.md",   raw=True),
-            AgentFile("prompts/new-spec.prompt.md.j2",     ".github/prompts/new-spec.prompt.md",     raw=True),
+            AgentFile("prompts/execute-spec.prompt.md.j2",        ".github/prompts/execute-spec.prompt.md",        raw=True),
+            AgentFile("prompts/sync-agent.prompt.md.j2",          ".github/prompts/sync-agent.prompt.md",          raw=True),
+            AgentFile("prompts/new-spec.prompt.md.j2",            ".github/prompts/new-spec.prompt.md",            raw=True),
             AgentFile("prompts/update-constitution.prompt.md.j2", ".github/prompts/update-constitution.prompt.md", raw=True),
+            AgentFile("prompts/update-spec.prompt.md.j2",         ".github/prompts/update-spec.prompt.md",         raw=True),
+            AgentFile("prompts/update-plan.prompt.md.j2",         ".github/prompts/update-plan.prompt.md",         raw=True),
+            AgentFile("prompts/update-tasks.prompt.md.j2",        ".github/prompts/update-tasks.prompt.md",        raw=True),
         ],
         full=[],
     ),
@@ -147,8 +145,8 @@ AGENTS: dict[str, AgentConfig] = {
         name="aider",
         display_name="Aider",
         basic=[
-            AgentFile(".aider.conf.yml.j2",  ".aider.conf.yml"),
-            AgentFile("CONVENTIONS.md.j2",   "CONVENTIONS.md"),
+            AgentFile(".aider.conf.yml.j2", ".aider.conf.yml"),
+            AgentFile("CONVENTIONS.md.j2",  "CONVENTIONS.md"),
         ],
         standard=[],
         full=[],
@@ -168,7 +166,6 @@ AGENTS: dict[str, AgentConfig] = {
 
 
 def get_agent(name: str) -> AgentConfig:
-    """Return AgentConfig by name. Raises KeyError if not found."""
     if name not in AGENTS:
         valid = ", ".join(AGENTS.keys())
         raise KeyError(f"Unknown agent '{name}'. Valid options: {valid}")

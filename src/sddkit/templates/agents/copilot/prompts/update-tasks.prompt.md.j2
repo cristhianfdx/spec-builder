@@ -1,0 +1,35 @@
+---
+name: update-tasks
+description: Update tasks.md — add, remove, or reorder tasks without touching completed ones.
+---
+
+Configuration:
+- SPEC_NAME: 001-initial-setup
+
+Path resolution:
+- SPEC_FILE = .specify/specs/{SPEC_NAME}/spec.md
+- TASKS_FILE = .specify/specs/{SPEC_NAME}/tasks.md
+
+Mandatory reading order:
+
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. {SPEC_FILE}
+4. {TASKS_FILE}
+
+Change request: <!-- describe what to add, remove, or reorganize in tasks.md -->
+
+Execution rules:
+
+1. NEVER modify or remove completed tasks (- [x]). They are permanent record.
+2. Adding tasks: append new (- [ ]) items. Must map to a criterion in spec.md.
+3. Removing a pending task: mark as obsolete with reason — never hard-delete.
+4. Reordering: only reorder pending tasks. Never move completed ones.
+5. Splitting a task: replace with 2-3 smaller ones, add split comment.
+6. All new tasks must be atomic — completable in a single focused session.
+7. If new tasks are not covered by any criterion in spec.md, flag it first.
+
+Required output:
+1. What changed in tasks.md (added / marked obsolete / reordered).
+2. Total pending tasks remaining after the update.
+3. Whether new tasks are covered by existing criteria in spec.md.

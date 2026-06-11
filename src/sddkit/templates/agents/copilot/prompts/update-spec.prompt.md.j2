@@ -1,0 +1,38 @@
+---
+name: update-spec
+description: Update spec.md — criteria, status, scope, or dependencies.
+---
+
+Configuration:
+- SPEC_NAME: 001-initial-setup
+
+Path resolution:
+- SPEC_FILE = .specify/specs/{SPEC_NAME}/spec.md
+- PLAN_FILE = .specify/specs/{SPEC_NAME}/plan.md
+- TASKS_FILE = .specify/specs/{SPEC_NAME}/tasks.md
+
+Mandatory reading order:
+
+1. .github/copilot-instructions.md
+2. .specify/memory/constitution.md
+3. {SPEC_FILE}
+4. {PLAN_FILE}
+5. {TASKS_FILE}
+
+Change request: <!-- describe what to add, remove, or modify in spec.md -->
+
+Execution rules:
+
+1. Read {SPEC_FILE} in full before changing anything.
+2. Apply the requested change precisely — do not rewrite unrelated sections.
+3. Preserve existing structure, formatting, and section order.
+4. Adding criteria: append to Acceptance Criteria. Do not renumber existing ones.
+5. Removing criteria: mark as strikethrough with reason — never hard-delete unless asked.
+6. Updating status: only valid transitions are draft → in-progress → complete.
+7. If the change contradicts the constitution, flag it and stop.
+8. After updating, check if tasks.md needs new tasks to cover added criteria.
+
+Required output:
+1. What changed in spec.md (before/after summary per section).
+2. Whether plan.md or tasks.md need follow-up updates.
+3. Whether the change is consistent with the constitution.
