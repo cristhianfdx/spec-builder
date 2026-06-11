@@ -1,0 +1,73 @@
+---
+name: new-spec
+description: Create a new spec (spec.md + plan.md + tasks.md) for a given feature
+variables:
+  - name: FEATURE_NAME
+    description: Human-readable feature name (e.g. "User Authentication")
+    required: true
+  - name: AGENT
+    description: Active AI agent
+    default: "claude-code"
+agents: [claude-code, copilot, cursor, gemini-cli, generic]
+---
+
+# New Spec — {{ FEATURE_NAME }}
+
+**Agent:** {{ AGENT }}
+
+## Objective
+
+Create a complete, consistent spec for **{{ FEATURE_NAME }}** following the SDD methodology.
+
+## Mandatory Reading Order
+
+Before writing anything, read:
+
+1. `.specify/memory/constitution.md`
+2. All existing specs in `.specify/specs/` (to understand context and avoid duplication)
+
+## Execution Flow
+
+1. Determine the next spec number by counting existing folders in `.specify/specs/`.
+2. Create the folder `.specify/specs/<NNN>-<slug>/` where `<slug>` is a kebab-case version of the feature name.
+3. Create the three files inside:
+
+### spec.md
+
+Must contain:
+- Status: `draft`
+- Dependencies on other specs (if any)
+- Context: background and motivation
+- Objective: one-sentence summary
+- Normative reference to the constitution
+- Acceptance criteria (verifiable outcomes, not implementation details)
+- Out of scope section
+
+### plan.md
+
+Must contain:
+- Architecture: how this fits into the existing system
+- Module responsibilities table
+- Key technical decisions with rationale
+- No duplication of normative rules from the constitution
+
+### tasks.md
+
+Must contain:
+- Executable checkbox list (`- [ ]`)
+- Each task must be completable in a single focused session
+- Tasks must map 1:1 to acceptance criteria in spec.md
+
+## Quality Criteria
+
+- Acceptance criteria describe outcomes, not implementations.
+- Tasks are atomic and verifiable.
+- No contradictions with the constitution.
+- No invented technologies outside the allowed stack.
+
+## Required Output
+
+1. The spec folder and three files created.
+2. Summary of acceptance criteria defined.
+3. Number of tasks created.
+4. Any open questions or ambiguities that need resolution before implementation.

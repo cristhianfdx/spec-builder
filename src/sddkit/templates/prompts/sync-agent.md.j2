@@ -1,0 +1,58 @@
+---
+name: sync-agent
+description: Regenerate or update AGENTS.md to reflect the current project state
+variables:
+  - name: AGENT
+    description: Active AI agent
+    default: "claude-code"
+agents: [claude-code, copilot, cursor, gemini-cli, generic]
+---
+
+# Sync Agent — {{ AGENT }}
+
+## Objective
+
+Keep `AGENTS.md` always up to date with the latest project state.
+If `AGENTS.md` does not exist, create it from scratch.
+
+## Mandatory Reading Order
+
+1. Agent instruction file (CLAUDE.md / copilot-instructions.md / AGENTS.md)
+2. `.specify/memory/constitution.md`
+3. All active specs: `spec.md`, `plan.md`, `tasks.md`
+
+## Execution Flow
+
+1. **Detect changes:** inspect the current folder and file structure, prioritizing changes in the source directory, `.specify/`, and the agent instruction file.
+2. **Sync AGENTS.md:**
+   - If it exists: update only what changed (incremental approach, do not rewrite everything).
+   - If it does not exist: create it with the full structure below.
+   - Preserve useful manual content that does not contradict the real repo state.
+   - Remove obsolete or inconsistent information.
+
+## Required Structure for AGENTS.md
+
+Minimum sections:
+
+- Project summary
+- Tech stack and constraints
+- Current folder structure
+- Key modules and their responsibilities
+- Agent operational flows (how to contribute, validate, and maintain consistency)
+- SDD rules applicable to this repo
+- Critical files and their purpose
+- "Last sync" section with today's date and a short summary of detected changes
+
+## Quality Criteria
+
+- Clear, actionable, unambiguous content.
+- No invented files, commands, or capabilities.
+- Consistent with the constitution and the active spec.
+- Plain text only (no emojis, no Unicode icons).
+
+## Required Output
+
+1. Whether AGENTS.md was created or updated.
+2. Summary of changes applied.
+3. List of project files considered for the sync.
+4. Confirmation that the content is aligned with `.specify/` and the current repo state.
